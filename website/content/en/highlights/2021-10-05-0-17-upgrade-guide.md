@@ -10,12 +10,13 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes two **breaking changes**:
+Vector's 0.17.0 release includes three **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
-1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
+2. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
+3. [Field name change for aggregated summaries in `metric_to_log` transform](#agg_summary_metric_to_log)
 
-We cover it below to help you upgrade quickly:
+We cover them below to help you upgrade quickly:
 
 ## Upgrade guide
 
@@ -39,3 +40,12 @@ with your timeout settings.
 
 Users that have previously set `batch.max_bytes` may now safely remove the
 value. If it is left the setting will have no effect.
+
+### Field name change for aggregated summaries in `metric_to_log` transform {#agg_summary_metric_to_log}
+
+We've updated the rendered fields for "aggregated summaries" when emitted by the `metric_to_log`
+transform to better align with the actual data itself.  Instead of `upper_limit`, the field which
+holds the quantile is now called `q`, which is a common shorthand for "quantile".
+
+`upper_limit` is a holdover from the initial implementation of metrics support in Vector and applies
+to aggregated histograms, but not to aggregated summaries.
