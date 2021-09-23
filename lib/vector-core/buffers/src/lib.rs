@@ -21,12 +21,11 @@ mod test;
 mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
-use crate::internal_events::EventsDropped;
 pub use acker::Acker;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use internal_event::emit;
-use internal_events::{EventsReceived, EventsSent};
+use internal_events::{BufferCreated, BufferMaxSize, EventsDropped, EventsReceived, EventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -72,21 +71,30 @@ where
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
             let tx = BufferInputCloner::Disk(tx, when_full);
+            emit(&BufferCreated {
+                max_size: BufferMaxSize::Bytes(max_size),
+                id,
+            });
             Ok((tx, rx, acker))
         }
         Variant::Memory {
             max_events,
             when_full,
+            id,
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             let tx = BufferInputCloner::Memory(tx, when_full);
-            let rx = rx.inspect(|item| {
+            let rx = rx.inspect(move |item| {
                 emit(&EventsSent {
                     count: 1,
                     byte_size: size_of_val(item),
                 })
             });
             let rx = Box::new(rx);
+            emit(&BufferCreated {
+                max_size: BufferMaxSize::Events(max_events),
+                id,
+            });
             Ok((tx, rx, Acker::Null))
         }
     }

@@ -169,6 +169,7 @@ pub async fn build_pieces(
             vector_core::buffers::build(vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
+                id: key.to_string(),
             })
             .unwrap();
         let input_rx = crate::utilization::wrap(Pin::new(input_rx));

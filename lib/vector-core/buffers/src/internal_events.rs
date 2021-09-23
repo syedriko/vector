@@ -1,5 +1,29 @@
 use internal_event::InternalEvent;
-use metrics::{counter, decrement_gauge, increment_gauge};
+use metrics::{counter, decrement_gauge, gauge, increment_gauge};
+
+pub enum BufferMaxSize {
+    Events(usize),
+    Bytes(usize),
+}
+pub struct BufferCreated {
+    pub max_size: BufferMaxSize,
+    pub id: String,
+}
+
+impl InternalEvent for BufferCreated {
+    fn emit_logs(&self) {}
+
+    fn emit_metrics(&self) {
+        match self.max_size {
+            BufferMaxSize::Events(size) => {
+                gauge!("buffer_max_event_size", size as f64, "component_id" => self.id.clone());
+            }
+            BufferMaxSize::Bytes(size) => {
+                gauge!("buffer_max_byte_size", size as f64, "component_id" => self.id.clone());
+            }
+        }
+    }
+}
 
 pub struct EventsReceived {
     pub count: usize,

@@ -161,6 +161,7 @@ impl BufferConfig {
             } => Variant::Memory {
                 max_events: *max_events,
                 when_full: *when_full,
+                id: sink_id.to_string(),
             },
             #[cfg(feature = "disk-buffer")]
             BufferConfig::Disk {

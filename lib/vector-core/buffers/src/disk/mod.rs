@@ -121,7 +121,7 @@ where
         })?;
 
     let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size)?;
-    let reader = reader.inspect(|item| {
+    let reader = reader.inspect(move |item| {
         emit(&EventsSent {
             count: 1,
             byte_size: size_of_val(item),

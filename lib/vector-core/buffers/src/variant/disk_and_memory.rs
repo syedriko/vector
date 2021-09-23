@@ -16,6 +16,7 @@ pub enum Variant {
     Memory {
         max_events: usize,
         when_full: WhenFull,
+        id: String,
     },
     Disk {
         max_size: usize,
@@ -51,6 +52,7 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
+                id: "".to_string(),
             }
         } else {
             Variant::Disk {
@@ -67,11 +69,14 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events,
                 when_full,
+                id,
             } => {
                 let when_full = *when_full;
+                let id = id.clone();
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
+                    id: id.clone(),
                 }))
             }
             Variant::Disk {
