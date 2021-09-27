@@ -1,7 +1,7 @@
 use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
+    codecs::{self, DecodingConfig},
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode},
+    internal_events::{SocketEventsReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -9,6 +9,7 @@ use crate::{
 use bytes::Bytes;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
@@ -16,9 +17,6 @@ pub struct TcpConfig {
     address: SocketListenAddr,
     #[get_copy = "pub"]
     keepalive: Option<TcpKeepaliveConfig>,
-    #[serde(default = "default_max_length")]
-    #[getset(get_copy = "pub", set = "pub")]
-    max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     #[getset(get_copy = "pub", set = "pub")]
     shutdown_timeout_secs: u64,
@@ -28,10 +26,9 @@ pub struct TcpConfig {
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
+    #[serde(flatten, default)]
+    #[getset(get = "pub", set = "pub")]
+    decoding: DecodingConfig,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -42,20 +39,20 @@ impl TcpConfig {
     pub const fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
-        max_length: usize,
         shutdown_timeout_secs: u64,
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
+        decoding: DecodingConfig,
     ) -> Self {
         Self {
             address,
             keepalive,
-            max_length,
             shutdown_timeout_secs,
             host_key,
             tls,
             receive_buffer_bytes,
+            decoding,
         }
     }
 
@@ -63,72 +60,55 @@ impl TcpConfig {
         Self {
             address,
             keepalive: None,
-            max_length: default_max_length(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
             tls: None,
             receive_buffer_bytes: None,
+            decoding: DecodingConfig::default(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RawTcpSource {
-    pub config: TcpConfig,
+    config: TcpConfig,
+    decoder: codecs::Decoder,
+}
+
+impl RawTcpSource {
+    pub const fn new(config: TcpConfig, decoder: codecs::Decoder) -> Self {
+        Self { config, decoder }
+    }
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = BoxedFramingError;
-    type Decoder = CharacterDelimitedCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        CharacterDelimitedCodec::new_with_max_length('\n', self.config.max_length)
+        self.decoder.clone()
     }
 
-    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
-        let byte_size = frame.len();
-        let mut event = Event::from(frame);
-
-        event.as_mut_log().insert(
-            crate::config::log_schema().source_type_key(),
-            Bytes::from("socket"),
-        );
-
-        let host_key = (self.config.host_key.clone())
-            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
-
-        event.as_mut_log().insert(host_key, host);
-
-        emit!(SocketEventReceived {
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        emit!(&SocketEventsReceived {
+            mode: SocketMode::Tcp,
             byte_size,
-            mode: SocketMode::Tcp
+            count: events.len()
         });
 
-        Some(event)
-    }
-}
+        for event in events {
+            if let Event::Log(ref mut log) = event {
+                log.insert(
+                    crate::config::log_schema().source_type_key(),
+                    Bytes::from("socket"),
+                );
 
-#[cfg(test)]
-mod test {
+                let host_key = (self.config.host_key.clone())
+                    .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
 
-    #[test]
-    fn tcp_it_defaults_max_length() {
-        let with: super::TcpConfig = toml::from_str(
-            r#"
-            address = "127.0.0.1:1234"
-            max_length = 19
-            "#,
-        )
-        .unwrap();
-
-        let without: super::TcpConfig = toml::from_str(
-            r#"
-            address = "127.0.0.1:1234"
-            "#,
-        )
-        .unwrap();
-
-        assert_eq!(with.max_length, 19);
-        assert_eq!(without.max_length, super::default_max_length());
+                log.insert(host_key, host.clone());
+            }
+        }
     }
 }

@@ -3,7 +3,6 @@ use crate::config::SinkContext;
 use crate::sinks::datadog::logs::config::Encoding;
 use crate::sinks::util::buffer::GZIP_FAST;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
-use crate::sinks::util::sink::{Response, ServiceLogic, StdServiceLogic};
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
 use flate2::write::GzEncoder;
@@ -29,7 +28,7 @@ use tracing_futures::Instrument;
 use twox_hash::XxHash64;
 use vector_core::buffers::Acker;
 use vector_core::config::{log_schema, LogSchema};
-use vector_core::event::{Event, EventFinalizers, Finalizable, Value};
+use vector_core::event::{Event, EventFinalizers, EventStatus, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::batcher::Batcher;
@@ -44,7 +43,7 @@ const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 const BATCH_GOAL_BYTES: usize = 4_250_000;
-const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Default)]
 struct EventPartitioner {}
@@ -106,9 +105,9 @@ impl<S> LogSinkBuilder<S> {
     pub fn build(self) -> LogSink<S> {
         LogSink {
             default_api_key: self.default_api_key,
-            encoding: Some(self.encoding),
-            acker: Some(self.context.acker()),
-            service: Some(self.service),
+            encoding: self.encoding,
+            acker: self.context.acker(),
+            service: self.service,
             timeout: self.timeout.unwrap_or(BATCH_DEFAULT_TIMEOUT),
             compression: self.compression.unwrap_or_default(),
             log_schema: self.log_schema.unwrap_or_else(|| log_schema()),
@@ -125,16 +124,16 @@ pub struct LogSink<S> {
     /// case we batch them by this default.
     default_api_key: Arc<str>,
     /// The ack system for this sink to vector's buffer mechanism
-    acker: Option<Acker>,
+    acker: Acker,
     /// The API service
-    service: Option<S>,
+    service: S,
     /// The encoding of payloads
     ///
     /// This struct always generates JSON payloads. However we do, technically,
     /// allow the user to set the encoding to a single value -- JSON -- and this
     /// encoding comes with rules on sanitizing the payload which must be
     /// applied.
-    encoding: Option<EncodingConfigWithDefault<Encoding>>,
+    encoding: EncodingConfigWithDefault<Encoding>,
     /// The compression technique to use when building the request body
     compression: Compression,
     /// The total duration before a flush is forced
@@ -252,29 +251,17 @@ impl<S> StreamSink for LogSink<S>
 where
     S: Service<LogApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let io_bandwidth = 64;
         let (io_tx, io_rx) = channel(io_bandwidth);
-        let service = self
-            .service
-            .take()
-            .expect("same sink should not be run twice");
-        let acker = self
-            .acker
-            .take()
-            .expect("same sink should not be run twice");
-        let encoding = self
-            .encoding
-            .take()
-            .expect("same sink should not be run twice");
+        let encoding = self.encoding;
         let default_api_key = Arc::clone(&self.default_api_key);
         let compression = self.compression;
         let log_schema = self.log_schema;
-
-        let io = run_io(io_rx, service, acker).in_current_span();
+        let io = run_io(io_rx, self.service, self.acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
@@ -323,7 +310,7 @@ async fn run_io<S>(mut rx: Receiver<LogApiRequest>, mut service: S, acker: Acker
 where
     S: Service<LogApiRequest>,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
@@ -351,10 +338,6 @@ where
                     message = "Submitting service request.",
                     in_flight_requests = in_flight.len()
                 );
-                // TODO: This likely need be parameterized, which builds a
-                // stronger case for following through with the comment
-                // mentioned below.
-                let logic = StdServiceLogic::default();
                 // TODO: I'm not entirely happy with how we're smuggling
                 // batch_size/finalizers this far through, from the finished
                 // batch all the way through to the concrete request type...we
@@ -368,8 +351,14 @@ where
                 let fut = svc.call(req)
                     .err_into()
                     .map(move |result| {
-                        logic.update_finalizers(result, finalizers);
-
+                        let status = match result {
+                            Err(error) => {
+                                error!("Sink IO failed with error: {}.", error);
+                                EventStatus::Failed
+                            },
+                            Ok(response) => { *response.as_ref() }
+                        };
+                        finalizers.update_status(status);
                         // If the rx end is dropped we still completed
                         // the request so this is a weird case that we can
                         // ignore for now.

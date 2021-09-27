@@ -87,7 +87,7 @@ components: sources: journald: {
 			type: object: {
 				examples: [
 					{
-						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
 						_TRANSPORT: ["kernel"]
 					},
 				]
@@ -99,7 +99,7 @@ components: sources: journald: {
 						type: array: {
 							default: []
 							items: type: string: {
-								examples: ["sshd.servcie", "ntpd.service"]
+								examples: ["sshd.service", "ntpd.service"]
 								syntax: "literal"
 							}
 						}
@@ -128,7 +128,7 @@ components: sources: journald: {
 			type: object: {
 				examples: [
 					{
-						_SYSTEMD_UNIT: ["sshd.servcie", "ntpd.service"]
+						_SYSTEMD_UNIT: ["sshd.service", "ntpd.service"]
 						_TRANSPORT: ["kernel"]
 					},
 				]
@@ -140,7 +140,7 @@ components: sources: journald: {
 						type: array: {
 							default: []
 							items: type: string: {
-								examples: ["sshd.servcie", "ntpd.service"]
+								examples: ["sshd.service", "ntpd.service"]
 								syntax: "literal"
 							}
 						}
@@ -264,11 +264,11 @@ components: sources: journald: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:            components.sources.internal_metrics.output.metrics.events_in_total
-		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
-		received_events_total:      components.sources.internal_metrics.output.metrics.received_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		invalid_record_total:            components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total:      components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }
