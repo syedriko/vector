@@ -124,6 +124,11 @@ impl TowerRequestConfig {
         self
     }
 
+    pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
+        self.retry_attempts = Some(retry_attempts);
+        self
+    }
+
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
             concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
