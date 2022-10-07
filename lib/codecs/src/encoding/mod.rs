@@ -12,7 +12,7 @@ pub use format::{
     GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
-    TextSerializerConfig,
+    TextSerializerConfig, SyslogSerializer, SyslogSerializerConfig, SyslogSerializerOptions,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -223,6 +223,13 @@ pub enum SerializerConfig {
     /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
     /// event.
     Text,
+
+    /// Syslog serilization.
+    Syslog {
+        /// Syslog serializer options.
+        #[serde(flatten)]
+        syslog: SyslogSerializerOptions,
+    },
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -273,6 +280,12 @@ impl From<TextSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<SyslogSerializerConfig> for SerializerConfig {
+    fn from(config: SyslogSerializerConfig) -> Self {
+        Self::Syslog { syslog: config.syslog }
+    }
+}
+
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
@@ -291,6 +304,9 @@ impl SerializerConfig {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
+            SerializerConfig::Syslog { syslog } => Ok(Serializer::Syslog(
+                SyslogSerializerConfig::new(syslog.clone()).build()?,
+            )),
         }
     }
 
@@ -307,6 +323,7 @@ impl SerializerConfig {
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text => TextSerializerConfig.input_type(),
+            SerializerConfig::Syslog { .. } => SyslogSerializerConfig::input_type(),
         }
     }
 
@@ -323,6 +340,7 @@ impl SerializerConfig {
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
+            SerializerConfig::Syslog { .. } => SyslogSerializerConfig::schema_requirement(),
         }
     }
 }
@@ -346,6 +364,8 @@ pub enum Serializer {
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
     Text(TextSerializer),
+    /// Uses a `SyslogSerializer` for serialization.
+    Syslog(SyslogSerializer),
 }
 
 impl Serializer {
@@ -357,6 +377,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Syslog(_)
             | Serializer::RawMessage(_) => false,
         }
     }
@@ -376,6 +397,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Syslog(_)
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
             }
@@ -431,6 +453,12 @@ impl From<TextSerializer> for Serializer {
     }
 }
 
+impl From<SyslogSerializer> for Serializer {
+    fn from(serializer: SyslogSerializer) -> Self {
+        Self::Syslog(serializer)
+    }
+}
+
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_common::Error;
 
@@ -444,6 +472,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),
+            Serializer::Syslog(serializer) => serializer.encode(event, buffer),
         }
     }
 }
