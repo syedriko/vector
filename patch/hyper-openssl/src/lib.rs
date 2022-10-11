@@ -238,10 +238,13 @@ where
                     trace!("TLS: current cipher: {}", stream.ssl().current_cipher().unwrap().name());
                     Ok(MaybeHttpsStream::Https(stream))
                 },
-                Err(error) => Err(Box::new(ConnectError {
-                    error,
-                    verify_result: stream.ssl().verify_result(),
-                }) as _),
+                Err(error) => {
+                    trace!("TLS: connect error: {}", error);
+                    Err(Box::new(ConnectError {
+                        error,
+                        verify_result: stream.ssl().verify_result(),
+                    }) as _)
+                },
             }
         };
 
