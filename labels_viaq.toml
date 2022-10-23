@@ -1,0 +1,27 @@
+data_dir = "/home/syedriko/rust/vector"
+
+[api]
+enabled = true
+
+[sources.log_generator]
+type = "exec"
+command = ["/home/syedriko/rust/vector/labels.sh"]
+mode = "streaming"
+
+[sources.log_generator.decoding]
+codec = "json"
+
+[sources.log_generator.framing]
+method = "newline_delimited"
+
+[transforms.viaq]
+type = "viaq"
+inputs = ["log_generator"]
+
+[sinks.console]
+inputs = ["viaq"]
+type = "console"
+target = "stdout"
+
+[sinks.console.encoding]
+codec = "json"

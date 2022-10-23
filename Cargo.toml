@@ -359,12 +359,16 @@ hyper-openssl = { path = "patch/hyper-openssl" }
 
 [features]
 ocp-logging = [
+  "api",
+  "api-client",
+
   "sources-file",
   "sources-journald",
   "sources-kubernetes_logs",
   "sources-prometheus",
   "sources-internal_metrics",
   "sources-demo_logs",
+  "sources-exec",
 
   "transforms-remove_fields",
   "transforms-rename_fields",
@@ -388,7 +392,8 @@ ocp-logging = [
   "sinks-console",
   "sinks-prometheus",
   "sinks-gcp",
-  "sinks-splunk_hec"
+  "sinks-splunk_hec",
+  "sinks-blackhole"
 ]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]

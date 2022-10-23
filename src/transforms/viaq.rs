@@ -20,12 +20,6 @@ inventory::submit! {
     TransformDescription::new::<ViaqConfig>("viaq")
 }
 
-/*
-inventory::submit! {
-    TransformDescription::new::<ViaqConfig>("viaq")
-}
-*/
-
 impl GenerateConfig for ViaqConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -39,9 +33,7 @@ impl GenerateConfig for ViaqConfig {
 #[typetag::serde(name = "viaq")]
 impl TransformConfig for ViaqConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Viaq::new(
-            self.foobar.clone(),
-        )))
+        Ok(Transform::function(Viaq::new()))
     }
 
     fn input(&self) -> Input {
@@ -57,46 +49,37 @@ impl TransformConfig for ViaqConfig {
     }
 }
 
-// Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct ViaqCompatConfig(ViaqConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "viaq")]
-impl TransformConfig for ViaqCompatConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        self.0.build(context).await
-    }
-
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        self.0.outputs(merged_definition)
-    }
-
-    fn transform_type(&self) -> &'static str {
-        self.0.transform_type()
-    }
-}
-
 #[derive(Clone)]
-pub struct Viaq {
-    foobar: Option<String>,
-}
+pub struct Viaq {}
 
 impl Viaq {
-    pub const fn new(foobar: Option<String>) -> Self {
-        Self {
-            foobar,
-        }
+    pub const fn new() -> Self {
+        Self {}
     }
 }
 
+const EXCLUSIONS: [&'static str; 7] = ["app.kubernetes.io/name", "app.kubernetes.io/instance",
+ "app.kubernetes.io/version", "app.kubernetes.io/component",
+ "app.kubernetes.io/part-of", "app.kubernetes.io/managed-by",
+ "app.kubernetes.io/created-by"
+];
+
 impl FunctionTransform for Viaq {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        self.foobar.as_ref();
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+        let mut flat_labels = Vec::<String>::new();
+        if let Some(labels) = event.as_mut_log().get_mut("kubernetes.labels") {
+            if labels.is_object() {
+                for (key, value) in labels.as_object().unwrap().iter() {
+                    if value.is_bytes() {
+                        flat_labels.push(key.to_string() + "=" + &value.as_str().unwrap());
+                    }
+                }
+                EXCLUSIONS.iter().for_each(|x|{ labels.as_object_mut_unwrap().remove_entry(&x.to_string()); });
+            }
+        }
+        if !flat_labels.is_empty() {
+            event.as_mut_log().insert("kubernetes.flat_labels", flat_labels);
+        }
         output.push(event);
     }
 }
