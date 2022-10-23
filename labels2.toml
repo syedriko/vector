@@ -1,0 +1,18 @@
+[sources.log_generator2]
+type = "exec"
+command = ["/home/syedriko/rust/vector/labels.sh"]
+mode = "streaming"
+
+[sources.log_generator2.decoding]
+codec = "json"
+
+[sources.log_generator2.framing]
+method = "newline_delimited"
+
+[transforms.viaq]
+type = "viaq"
+inputs = ["log_generator2"]
+
+[sinks.blackhole2]
+type = "blackhole"
+inputs = ["viaq"]

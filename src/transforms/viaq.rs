@@ -74,7 +74,7 @@ impl FunctionTransform for Viaq {
                         flat_labels.push(key.to_string() + "=" + &value.as_str().unwrap());
                     }
                 }
-                EXCLUSIONS.iter().for_each(|x|{ labels.as_object_mut_unwrap().remove_entry(&x.to_string()); });
+                labels.as_object_mut_unwrap().retain(|k, _| EXCLUSIONS.contains(&k.as_str()));
             }
         }
         if !flat_labels.is_empty() {

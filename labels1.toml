@@ -1,0 +1,59 @@
+[sources.log_generator1]
+type = "exec"
+command = ["/home/syedriko/rust/vector/labels.sh"]
+mode = "streaming"
+
+[sources.log_generator1.decoding]
+codec = "json"
+
+[sources.log_generator1.framing]
+method = "newline_delimited"
+
+[transforms.default_dedot_and_flatten]
+type = "lua"
+inputs = ["log_generator1"]
+version = "2"
+hooks.process = "process"
+source = '''
+    function process(event, emit)
+        if event.log.kubernetes == nil then
+           emit(event)
+           return
+        end
+        if event.log.kubernetes.labels == nil then
+            emit(event)
+            return
+        end
+        flatten_labels(event)
+        prune_labels(event)
+        emit(event)
+    end
+
+    function flatten_labels(event)
+        -- create "flat_labels" key
+        event.log.kubernetes.flat_labels = {}
+        i = 1
+        -- flatten the labels
+        for k,v in pairs(event.log.kubernetes.labels) do
+          event.log.kubernetes.flat_labels[i] = k.."="..v
+          i=i+1
+        end
+    end
+
+    function prune_labels(event)
+        local exclusions = {"app.kubernetes.io/name", "app.kubernetes.io/instance", "app.kubernetes.io/version", "app.kubernetes.io/component", "app.kubernetes.io/part-of", "app.kubernetes.io/managed-by", "app.kubernetes.io/created-by"}
+        local keys = {}
+        for k,v in pairs(event.log.kubernetes.labels) do
+            for index, e in pairs(exclusions) do
+                if k == e then
+                    keys[k] = v
+                end
+            end
+        end
+        event.log.kubernetes.labels = keys
+    end
+'''
+
+[sinks.blackhole1]
+type = "blackhole"
+inputs = ["default_dedot_and_flatten"]
