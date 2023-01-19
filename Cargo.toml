@@ -359,6 +359,7 @@ ocp-logging = [
   "transforms-lua",
   "transforms-throttle",
   "transforms-reduce",
+  "transforms-aws_ec2_metadata",
 
   "vrl-cli",
 
