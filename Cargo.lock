@@ -588,8 +588,6 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "aws-config"
 version = "0.51.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56a636c44c77fa18bdba56126a34d30cfe5538fe88f7d34988fa731fee143ddd"
 dependencies = [
  "aws-http",
  "aws-sdk-sso",
@@ -605,7 +603,7 @@ dependencies = [
  "hex",
  "http",
  "hyper",
- "ring",
+ "openssl",
  "time",
  "tokio",
  "tower",
@@ -867,8 +865,6 @@ dependencies = [
 [[package]]
 name = "aws-sigv4"
 version = "0.51.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03ff4cff8c4a101962d593ba94e72cd83891aecd423f0c6e3146bff6fb92c9e3"
 dependencies = [
  "aws-smithy-eventstream",
  "aws-smithy-http",
@@ -877,9 +873,9 @@ dependencies = [
  "hex",
  "http",
  "once_cell",
+ "openssl",
  "percent-encoding",
  "regex",
- "ring",
  "time",
  "tracing 0.1.37",
 ]
@@ -932,8 +928,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
- "hyper-rustls",
- "lazy_static",
+ "hyper-tls",
  "pin-project-lite",
  "tokio",
  "tower",
@@ -5350,7 +5345,6 @@ dependencies = [
  "autocfg",
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
