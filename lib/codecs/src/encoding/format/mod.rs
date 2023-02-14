@@ -7,11 +7,13 @@ mod json;
 mod native;
 mod native_json;
 mod raw_message;
+mod syslog;
 
 pub use json::{JsonSerializer, JsonSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
 
 use dyn_clone::DynClone;
 use std::fmt::Debug;

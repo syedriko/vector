@@ -7,7 +7,7 @@ pub mod framing;
 pub use format::{
     BoxedSerializer, JsonSerializer, JsonSerializerConfig, NativeJsonSerializer,
     NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    RawMessageSerializerConfig, SyslogSerializer, SyslogSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -159,6 +159,8 @@ pub enum SerializerConfig {
     Json,
     /// Configures the `RawMessageSerializer`.
     RawMessage,
+    /// Configures the `SyslogSerializer`.
+    Syslog,
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
@@ -173,6 +175,12 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<SyslogSerializerConfig> for SerializerConfig {
+    fn from(_: SyslogSerializerConfig) -> Self {
+        Self::Syslog
+    }
+}
+
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub const fn build(&self) -> Serializer {
@@ -180,7 +188,8 @@ impl SerializerConfig {
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
-            }
+            },
+            SerializerConfig::Syslog => Serializer::Syslog(SyslogSerializerConfig.build()),
         }
     }
 
@@ -189,6 +198,7 @@ impl SerializerConfig {
         match self {
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+            SerializerConfig::Syslog => SyslogSerializerConfig.schema_requirement(),
         }
     }
 }
@@ -200,6 +210,8 @@ pub enum Serializer {
     Json(JsonSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
+    /// Uses a `SyslogSerializer` for serialization.
+    Syslog(SyslogSerializer),
 }
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
@@ -209,6 +221,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
         match self {
             Serializer::Json(serializer) => serializer.encode(item, dst),
             Serializer::RawMessage(serializer) => serializer.encode(item, dst),
+            Serializer::Syslog(serializer) => serializer.encode(item, dst),
         }
     }
 }
