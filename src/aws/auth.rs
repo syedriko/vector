@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, imds, sts::AssumeRoleProviderBuilder,
+    profile::{profile_file::{ ProfileFiles, ProfileFileKind }, ProfileFileCredentialsProvider},
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde_with::serde_as;
@@ -138,8 +139,14 @@ impl AwsAuthentication {
                 secret_access_key.inner(),
                 None,
             ))),
-            AwsAuthentication::File { .. } => {
-                Err("Overriding the credentials file is not supported.".into())
+            AwsAuthentication::File { credentials_file, profile: _ } => {
+                let profile_files = ProfileFiles::builder()
+                    .with_file(ProfileFileKind::Credentials, credentials_file)
+                    .build();
+                let provider = ProfileFileCredentialsProvider::builder()
+                    .profile_files(profile_files.clone())
+                    .build();
+                Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Role {
                 assume_role,
