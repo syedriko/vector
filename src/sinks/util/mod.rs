@@ -404,6 +404,19 @@ fn get_field(config_name: &String, log: &LogEvent) -> String {
     }
 }
 
+fn get_timestamp(log: &LogEvent) -> DateTime::<Local> {
+    match log.get("@timestamp") {
+        Some(value) => {
+            if let Value::Timestamp(timestamp) = value {
+                DateTime::<Local>::from(*timestamp)
+            } else {
+                Local::now()
+            }
+        },
+        _ => Local::now()
+    }
+}
+
 /**
 * Encodes the given event into raw bytes that can be sent into a Sink, according to
 * the given encoding. If there are any errors encoding the event, logs a warning
@@ -429,11 +442,9 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
             buf.push_str(">");
             match config.rfc {
                 SyslogRFC::Rfc3164 => {
-                    if let Value::Timestamp(timestamp) = log.get(crate::config::log_schema().timestamp_key()).unwrap() {
-                        let local_timestamp = DateTime::<Local>::from(*timestamp);
-                        let formatted_timestamp = format!(" {} ", local_timestamp.format("%b %e %H:%M:%S"));
-                        buf.push_str(&formatted_timestamp);
-                    }
+                    let timestamp = get_timestamp(&log);
+                    let formatted_timestamp = format!(" {} ", timestamp.format("%b %e %H:%M:%S"));
+                    buf.push_str(&formatted_timestamp);
                     buf.push_str(&String::from_utf8(
                         log
                         .get(crate::config::log_schema().host_key())
@@ -455,9 +466,8 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                 },
                 SyslogRFC::Rfc5424 => {
                     buf.push_str("1 ");
-                    if let Value::Timestamp(timestamp) = log.get(crate::config::log_schema().timestamp_key()).unwrap() {
-                        buf.push_str(&timestamp.to_rfc3339_opts(SecondsFormat::Millis, true));
-                    }
+                    let timestamp = get_timestamp(&log);
+                    buf.push_str(&timestamp.to_rfc3339_opts(SecondsFormat::Millis, true));
                     buf.push(' ');
                     buf.push_str(&String::from_utf8(
                         log
