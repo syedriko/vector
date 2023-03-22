@@ -42,6 +42,7 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 use serde::{Deserialize, Serialize};
+use serde::de;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
@@ -49,8 +50,9 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-
-use crate::event::{Event, EventFinalizers};
+use chrono::{DateTime, SecondsFormat, Local};
+use value::Value;
+use crate::event::{Event, LogEvent, EventFinalizers};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -104,14 +106,315 @@ impl<I> EncodedEvent<I> {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SyslogRFC {
+    Rfc3164,
+    Rfc5424
+}
+
+impl Default for SyslogRFC {
+    fn default() -> Self {
+        SyslogRFC::Rfc5424
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+enum Facility {
+    Fixed(u8),
+    Field(String)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+enum Severity {
+    Fixed(u8),
+    Field(String)
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct SyslogConf {
+    #[serde(default)]
+    rfc: SyslogRFC,
+    #[serde(default = "default_facility")]
+    #[serde(deserialize_with = "deserialize_facility")]
+    facility: Facility,
+    #[serde(default = "default_severity")]
+    #[serde(deserialize_with = "deserialize_severity")]
+    severity: Severity,
+    #[serde(default)]
+    tag: String,
+    trim_prefix: Option<String>,
+    payload_key: Option<String>,
+    #[serde(default)]
+    add_log_source: bool,
+    // rfc5424 only
+    #[serde(default)]
+    app_name: String,
+    #[serde(default)]
+    proc_id: String,
+    #[serde(default)]
+    msg_id: String
+}
+
+fn default_facility() -> Facility {
+    Facility::Fixed(0)
+}
+
+fn deserialize_facility<'de, D>(d: D) -> Result<Facility, D::Error>
+    where D: de::Deserializer<'de>
+{
+    let value: String = String::deserialize(d)?;
+    let num_value = value.parse::<u8>();
+    match num_value {
+        Ok(num) => {
+            if num > 23 {
+                return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"facility number too large"));
+            } else {
+                return Ok(Facility::Fixed(num));
+            }
+        }
+        Err(_) => {
+            if let Some(field_name) = value.strip_prefix("$.message.") {
+                return Ok(Facility::Field(field_name.to_string()));
+            } else {
+                let num = match value.to_uppercase().as_str() {
+                    "KERN" => 0,
+                    "USER" => 1,
+                    "MAIL" => 2,
+                    "DAEMON" => 3,
+                    "AUTH" => 4,
+                    "SYSLOG" => 5,
+                    "LPR" => 6,
+                    "NEWS" => 7,
+                    "UUCP" => 8,
+                    "CRON" => 9,
+                    "AUTHPRIV" => 10,
+                    "FTP" => 11,
+                    "NTP" => 12,
+                    "SECURITY" => 13,
+                    "CONSOLE" => 14,
+                    "SOLARIS-CRON" => 15,
+                    "LOCAL0" => 16,
+                    "LOCAL1" => 17,
+                    "LOCAL2" => 18,
+                    "LOCAL3" => 19,
+                    "LOCAL4" => 20,
+                    "LOCAL5" => 21,
+                    "LOCAL6" => 22,
+                    "LOCAL7" => 23,
+                    _ => 24,
+                };
+                if num == 24 {
+                    return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown facility"));
+                } else {
+                    return Ok(Facility::Fixed(num))
+                }
+            }
+        }
+    }
+}
+
+fn default_severity() -> Severity {
+    Severity::Fixed(0)
+}
+
+fn deserialize_severity<'de, D>(d: D) -> Result<Severity, D::Error>
+    where D: de::Deserializer<'de>
+{
+    let value: String = String::deserialize(d)?;
+    let num_value = value.parse::<u8>();
+    match num_value {
+        Ok(num) => {
+            if num > 6 {
+                return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"severity number too large"))
+            } else {
+                return Ok(Severity::Fixed(num))
+            }
+        }
+        Err(_) => {
+            if let Some(field_name) = value.strip_prefix("$.message.") {
+                return Ok(Severity::Field(field_name.to_string()));
+            } else {
+                let num = match value.to_uppercase().as_str() {
+                    "EMERGENCY" => 0,
+                    "ALERT" => 1,
+                    "CRITICAL" => 2,
+                    "ERROR" => 3,
+                    "WARNING" => 4,
+                    "INFORMATIONAL" => 5,
+                    "DEBUG" => 6,
+                    _ => 7,
+                };
+                if num > 6 {
+                    return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown severity"))
+                } else {
+                    return Ok(Severity::Fixed(num))
+                }
+            }
+        }
+    }
+}
+
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
     Json,
+    Syslog(SyslogConf),
+}
+
+fn add_log_source(log: &LogEvent, buf: &mut String) {
+    buf.push_str("namespace_name=");
+    buf.push_str(&String::from_utf8(
+        log
+        .get("kubernetes.namespace_name")
+        .map(|h| h.coerce_to_bytes())
+        .unwrap_or_default().to_vec()
+    ).unwrap());
+    buf.push_str(",");
+    buf.push_str("pod_name=");
+    buf.push_str(&String::from_utf8(
+        log
+        .get("hostname")
+        .map(|h| h.coerce_to_bytes())
+        .unwrap_or_default().to_vec()
+    ).unwrap());
+    buf.push_str(",");
+    buf.push_str("container_name=");
+    buf.push_str(&String::from_utf8(
+        log
+        .get("kubernetes.container_name")
+        .map(|h| h.coerce_to_bytes())
+        .unwrap_or_default().to_vec()
+    ).unwrap());
+    buf.push_str(",");
+    buf.push_str("message=");
+}
+
+fn get_num_facility(config_facility: &Facility, log: &LogEvent) -> u8 {
+    match config_facility {
+        Facility::Fixed(num) => return *num,
+        Facility::Field(field_name) => {
+            if let Some(field_value) = log.get(field_name.as_str()) {
+                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+                let num_value = field_value_string.parse::<u8>();
+                match num_value {
+                    Ok(num) => {
+                        if num > 23 {
+                            return 1 // USER
+                        } else {
+                            return num
+                        }
+                    }
+                    Err(_) => {
+                            let num = match field_value_string.to_uppercase().as_str() {
+                                "KERN" => 0,
+                                "USER" => 1,
+                                "MAIL" => 2,
+                                "DAEMON" => 3,
+                                "AUTH" => 4,
+                                "SYSLOG" => 5,
+                                "LPR" => 6,
+                                "NEWS" => 7,
+                                "UUCP" => 8,
+                                "CRON" => 9,
+                                "AUTHPRIV" => 10,
+                                "FTP" => 11,
+                                "NTP" => 12,
+                                "SECURITY" => 13,
+                                "CONSOLE" => 14,
+                                "SOLARIS-CRON" => 15,
+                                "LOCAL0" => 16,
+                                "LOCAL1" => 17,
+                                "LOCAL2" => 18,
+                                "LOCAL3" => 19,
+                                "LOCAL4" => 20,
+                                "LOCAL5" => 21,
+                                "LOCAL6" => 22,
+                                "LOCAL7" => 23,
+                                _ => 24,
+                            };
+                            if num > 23 {
+                                return 1 // USER
+                            } else {
+                                return num
+                            }
+                        }
+                    }
+            } else {
+                return 1 // USER
+            }
+        }
+    }
+}
+
+fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
+    match config_severity {
+        Severity::Fixed(num) => return *num,
+        Severity::Field(field_name) => {
+            if let Some(field_value) = log.get(field_name.as_str()) {
+                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+                let num_value = field_value_string.parse::<u8>();
+                match num_value {
+                    Ok(num) => {
+                        if num > 6 {
+                            return 5 // INFORMATIONAL
+                        } else {
+                            return num
+                        }
+                    }
+                    Err(_) => {
+                            let num = match field_value_string.to_uppercase().as_str() {
+                                "EMERGENCY" => 0,
+                                "ALERT" => 1,
+                                "CRITICAL" => 2,
+                                "ERROR" => 3,
+                                "WARNING" => 4,
+                                "INFORMATIONAL" => 5,
+                                "DEBUG" => 6,
+                                _ => 7,
+                            };
+                            if num > 6 {
+                                return 5 // INFORMATIONAL
+                            } else {
+                                return num
+                            }
+                        }
+                    }
+            } else {
+                return 5 // INFORMATIONAL
+            }
+        }
+    }
+}
+
+fn get_field(config_name: &String, log: &LogEvent) -> String {
+    if let Some(field_name) = config_name.strip_prefix("$.message.") {
+        if let Some(field_value) = log.get(field_name) {
+            return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+        } else {
+            return "no_such_field".to_string()
+        }
+    } else {
+        return config_name.clone()
+    }
+}
+
+fn get_timestamp(log: &LogEvent) -> DateTime::<Local> {
+    match log.get("@timestamp") {
+        Some(value) => {
+            if let Value::Timestamp(timestamp) = value {
+                DateTime::<Local>::from(*timestamp)
+            } else {
+                Local::now()
+            }
+        },
+        _ => Local::now()
+    }
 }
 
 /**
@@ -131,6 +434,66 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                 .map(|v| v.coerce_to_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
+        }
+        Encoding::Syslog(config) => {
+            let mut buf = String::from("<");
+            let pri = get_num_facility(&config.facility, &log) * 8 + get_num_severity(&config.severity, &log);
+            buf.push_str(&pri.to_string());
+            buf.push_str(">");
+            match config.rfc {
+                SyslogRFC::Rfc3164 => {
+                    let timestamp = get_timestamp(&log);
+                    let formatted_timestamp = format!(" {} ", timestamp.format("%b %e %H:%M:%S"));
+                    buf.push_str(&formatted_timestamp);
+                    buf.push_str(&String::from_utf8(
+                        log
+                        .get(crate::config::log_schema().host_key())
+                        .map(|h| h.coerce_to_bytes())
+                        .unwrap_or_default().to_vec()
+                    ).unwrap());
+                    buf.push_str(" ");
+                    buf.push_str(&get_field(&config.tag, &log));
+                    buf.push_str(": ");
+                    if config.add_log_source {
+                        add_log_source(&log, &mut buf);
+                    }
+                    buf.push_str(&String::from_utf8(
+                        log
+                        .get(crate::config::log_schema().message_key())
+                        .map(|h| h.coerce_to_bytes())
+                        .unwrap_or_default().to_vec()
+                    ).unwrap());
+                },
+                SyslogRFC::Rfc5424 => {
+                    buf.push_str("1 ");
+                    let timestamp = get_timestamp(&log);
+                    buf.push_str(&timestamp.to_rfc3339_opts(SecondsFormat::Millis, true));
+                    buf.push(' ');
+                    buf.push_str(&String::from_utf8(
+                        log
+                        .get(crate::config::log_schema().host_key())
+                        .map(|h| h.coerce_to_bytes())
+                        .unwrap_or_default().to_vec()
+                    ).unwrap());
+                    buf.push_str(" ");
+                    buf.push_str(&get_field(&&config.app_name, &log));
+                    buf.push_str(" ");
+                    buf.push_str(&get_field(&&config.proc_id, &log));
+                    buf.push_str(" ");
+                    buf.push_str(&get_field(&&config.msg_id, &log));
+                    buf.push_str(" ");
+                    if config.add_log_source {
+                        add_log_source(&log, &mut buf);
+                    }
+                    buf.push_str(&String::from_utf8(
+                        log
+                        .get(crate::config::log_schema().message_key())
+                        .map(|h| h.coerce_to_bytes())
+                        .unwrap_or_default().to_vec()
+                    ).unwrap());
+                }
+            }
+            Ok(buf.as_bytes().to_vec())
         }
     };
 
