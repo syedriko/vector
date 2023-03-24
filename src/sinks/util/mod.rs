@@ -205,7 +205,7 @@ fn deserialize_facility<'de, D>(d: D) -> Result<Facility, D::Error>
                     "LOCAL7" => 23,
                     _ => 24,
                 };
-                if num == 24 {
+                if num > 23 {
                     return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown facility"));
                 } else {
                     return Ok(Facility::Fixed(num))
@@ -226,7 +226,7 @@ fn deserialize_severity<'de, D>(d: D) -> Result<Severity, D::Error>
     let num_value = value.parse::<u8>();
     match num_value {
         Ok(num) => {
-            if num > 6 {
+            if num > 7 {
                 return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"severity number too large"))
             } else {
                 return Ok(Severity::Fixed(num))
@@ -242,11 +242,12 @@ fn deserialize_severity<'de, D>(d: D) -> Result<Severity, D::Error>
                     "CRITICAL" => 2,
                     "ERROR" => 3,
                     "WARNING" => 4,
-                    "INFORMATIONAL" => 5,
-                    "DEBUG" => 6,
-                    _ => 7,
+                    "NOTICE" => 5,
+                    "INFORMATIONAL" => 6,
+                    "DEBUG" => 7,
+                    _ => 8,
                 };
-                if num > 6 {
+                if num > 7 {
                     return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown severity"))
                 } else {
                     return Ok(Severity::Fixed(num))
@@ -361,8 +362,8 @@ fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
                 let num_value = field_value_string.parse::<u8>();
                 match num_value {
                     Ok(num) => {
-                        if num > 6 {
-                            return 5 // INFORMATIONAL
+                        if num > 7 {
+                            return 6 // INFORMATIONAL
                         } else {
                             return num
                         }
@@ -374,19 +375,20 @@ fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
                                 "CRITICAL" => 2,
                                 "ERROR" => 3,
                                 "WARNING" => 4,
-                                "INFORMATIONAL" => 5,
-                                "DEBUG" => 6,
-                                _ => 7,
+                                "NOTICE" => 5,
+                                "INFORMATIONAL" => 6,
+                                "DEBUG" => 7,
+                                _ => 8,
                             };
-                            if num > 6 {
-                                return 5 // INFORMATIONAL
+                            if num > 7 {
+                                return 6 // INFORMATIONAL
                             } else {
                                 return num
                             }
                         }
                     }
             } else {
-                return 5 // INFORMATIONAL
+                return 6 // INFORMATIONAL
             }
         }
     }
