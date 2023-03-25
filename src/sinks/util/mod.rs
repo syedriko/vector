@@ -472,7 +472,7 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     buf.push_str(&get_field_or_config(&&config.proc_id, &log));
                     buf.push(' ');
                     buf.push_str(&get_field_or_config(&&config.msg_id, &log));
-                    buf.push(' ');
+                    buf.push_str(" - "); // no structured data
                     if config.add_log_source {
                         add_log_source(&log, &mut buf);
                     }
