@@ -394,15 +394,19 @@ fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
     }
 }
 
-fn get_field(config_name: &String, log: &LogEvent) -> String {
+fn get_field_or_config(config_name: &String, log: &LogEvent) -> String {
     if let Some(field_name) = config_name.strip_prefix("$.message.") {
-        if let Some(field_value) = log.get(field_name) {
-            return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
-        } else {
-            return "no_such_field".to_string()
-        }
+        return get_field(field_name, log)
     } else {
         return config_name.clone()
+    }
+}
+
+fn get_field(field_name: &str, log: &LogEvent) -> String {
+    if let Some(field_value) = log.get(field_name) {
+        return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+    } else {
+        return "-".to_string()
     }
 }
 
@@ -447,52 +451,32 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     let timestamp = get_timestamp(&log);
                     let formatted_timestamp = format!(" {} ", timestamp.format("%b %e %H:%M:%S"));
                     buf.push_str(&formatted_timestamp);
-                    buf.push_str(&String::from_utf8(
-                        log
-                        .get(crate::config::log_schema().host_key())
-                        .map(|h| h.coerce_to_bytes())
-                        .unwrap_or_default().to_vec()
-                    ).unwrap());
-                    buf.push_str(" ");
-                    buf.push_str(&get_field(&config.tag, &log));
+                    buf.push_str(&get_field("hostname", &log));
+                    buf.push(' ');
+                    buf.push_str(&get_field_or_config(&config.tag, &log));
                     buf.push_str(": ");
                     if config.add_log_source {
                         add_log_source(&log, &mut buf);
                     }
-                    buf.push_str(&String::from_utf8(
-                        log
-                        .get(crate::config::log_schema().message_key())
-                        .map(|h| h.coerce_to_bytes())
-                        .unwrap_or_default().to_vec()
-                    ).unwrap());
+                    buf.push_str(&get_field("message", &log));
                 },
                 SyslogRFC::Rfc5424 => {
                     buf.push_str("1 ");
                     let timestamp = get_timestamp(&log);
                     buf.push_str(&timestamp.to_rfc3339_opts(SecondsFormat::Millis, true));
                     buf.push(' ');
-                    buf.push_str(&String::from_utf8(
-                        log
-                        .get(crate::config::log_schema().host_key())
-                        .map(|h| h.coerce_to_bytes())
-                        .unwrap_or_default().to_vec()
-                    ).unwrap());
-                    buf.push_str(" ");
-                    buf.push_str(&get_field(&&config.app_name, &log));
-                    buf.push_str(" ");
-                    buf.push_str(&get_field(&&config.proc_id, &log));
-                    buf.push_str(" ");
-                    buf.push_str(&get_field(&&config.msg_id, &log));
-                    buf.push_str(" ");
+                    buf.push_str(&get_field("hostname", &log));
+                    buf.push(' ');
+                    buf.push_str(&get_field_or_config(&&config.app_name, &log));
+                    buf.push(' ');
+                    buf.push_str(&get_field_or_config(&&config.proc_id, &log));
+                    buf.push(' ');
+                    buf.push_str(&get_field_or_config(&&config.msg_id, &log));
+                    buf.push(' ');
                     if config.add_log_source {
                         add_log_source(&log, &mut buf);
                     }
-                    buf.push_str(&String::from_utf8(
-                        log
-                        .get(crate::config::log_schema().message_key())
-                        .map(|h| h.coerce_to_bytes())
-                        .unwrap_or_default().to_vec()
-                    ).unwrap());
+                    buf.push_str(&get_field("message", &log));
                 }
             }
             Ok(buf.as_bytes().to_vec())
