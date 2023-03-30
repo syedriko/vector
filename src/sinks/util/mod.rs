@@ -276,24 +276,21 @@ fn add_log_source(log: &LogEvent, buf: &mut String) {
         .map(|h| h.coerce_to_bytes())
         .unwrap_or_default().to_vec()
     ).unwrap());
-    buf.push_str(",");
-    buf.push_str("pod_name=");
-    buf.push_str(&String::from_utf8(
-        log
-        .get("hostname")
-        .map(|h| h.coerce_to_bytes())
-        .unwrap_or_default().to_vec()
-    ).unwrap());
-    buf.push_str(",");
-    buf.push_str("container_name=");
+    buf.push_str(", container_name=");
     buf.push_str(&String::from_utf8(
         log
         .get("kubernetes.container_name")
         .map(|h| h.coerce_to_bytes())
         .unwrap_or_default().to_vec()
     ).unwrap());
-    buf.push_str(",");
-    buf.push_str("message=");
+    buf.push_str(", pod_name=");
+    buf.push_str(&String::from_utf8(
+        log
+        .get("kubernetes.pod_name")
+        .map(|h| h.coerce_to_bytes())
+        .unwrap_or_default().to_vec()
+    ).unwrap());
+    buf.push_str(", message=");
 }
 
 fn get_num_facility(config_facility: &Facility, log: &LogEvent) -> u8 {
