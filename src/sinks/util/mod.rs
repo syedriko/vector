@@ -106,6 +106,8 @@ impl<I> EncodedEvent<I> {
     }
 }
 
+const NILVALUE: &'static str = "-";
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SyslogRFC {
@@ -150,11 +152,11 @@ pub struct SyslogConf {
     #[serde(default)]
     add_log_source: bool,
     // rfc5424 only
-    #[serde(default)]
+    #[serde(default = "default_app_name")]
     app_name: String,
-    #[serde(default)]
+    #[serde(default = "default_nilvalue")]
     proc_id: String,
-    #[serde(default)]
+    #[serde(default = "default_nilvalue")]
     msg_id: String
 }
 
@@ -256,6 +258,14 @@ fn deserialize_severity<'de, D>(d: D) -> Result<Severity, D::Error>
             }
         }
     }
+}
+
+fn default_app_name() -> String {
+    String::from("vector")
+}
+
+fn default_nilvalue() -> String {
+    String::from(NILVALUE)
 }
 
 /**
@@ -404,7 +414,7 @@ fn get_field(field_name: &str, log: &LogEvent) -> String {
     if let Some(field_value) = log.get(field_name) {
         return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
     } else {
-        return "-".to_string()
+        return NILVALUE.to_string()
     }
 }
 
