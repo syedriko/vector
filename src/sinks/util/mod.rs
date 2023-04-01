@@ -145,7 +145,8 @@ pub struct SyslogConf {
     #[serde(default)]
     tag: String,
     trim_prefix: Option<String>,
-    payload_key: Option<String>,
+    #[serde(default)]
+    payload_key: String,
     #[serde(default)]
     add_log_source: bool,
     // rfc5424 only
@@ -455,7 +456,6 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     if config.add_log_source {
                         add_log_source(&log, &mut buf);
                     }
-                    buf.push_str(&get_field("message", &log));
                 },
                 SyslogRFC::Rfc5424 => {
                     buf.push_str("1 ");
@@ -473,10 +473,16 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     if config.add_log_source {
                         add_log_source(&log, &mut buf);
                     }
-                    buf.push_str(&get_field("message", &log));
                 }
             }
-            Ok(buf.as_bytes().to_vec())
+            let mut payload = if config.payload_key.is_empty() {
+                serde_json::to_vec(&log).unwrap_or_default()
+            } else {
+                get_field(&&config.payload_key, &log).as_bytes().to_vec()
+            };
+            let mut vec = buf.as_bytes().to_vec();
+            vec.append(&mut payload);
+            Ok(vec)
         }
     };
 
