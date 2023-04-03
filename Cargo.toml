@@ -118,6 +118,9 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
+# Missing Rust features
+lazy_static = "1.4.0"
+
 # Tokio / Futures
 async-stream = "0.3.3"
 async-trait = "0.1.53"

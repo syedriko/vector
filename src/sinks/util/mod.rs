@@ -53,6 +53,9 @@ pub use uri::UriSerde;
 use chrono::{DateTime, SecondsFormat, Local};
 use value::Value;
 use crate::event::{Event, LogEvent, EventFinalizers};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -133,6 +136,69 @@ enum Severity {
     Field(String)
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+enum ByteField {
+    Fixed(u8),
+    Field(String)
+}
+
+const FACILITIES: &[&str] = &[
+    "KERN",
+    "USER",
+    "MAIL",
+    "DAEMON",
+    "AUTH",
+    "SYSLOG",
+    "LPR",
+    "NEWS",
+    "UUCP",
+    "CRON",
+    "AUTHPRIV",
+    "FTP",
+    "NTP",
+    "SECURITY",
+    "CONSOLE",
+    "SOLARIS-CRON",
+    "LOCAL0",
+    "LOCAL1",
+    "LOCAL2",
+    "LOCAL3",
+    "LOCAL4",
+    "LOCAL5",
+    "LOCAL6",
+    "LOCAL7"
+];
+
+const MAX_FACILITY: u8 = FACILITIES.len() as u8;
+
+const SEVERITIES: &[&str] = &[
+    "EMERGENCY",
+    "ALERT",
+    "CRITICAL",
+    "ERROR",
+    "WARNING",
+    "NOTICE",
+    "INFORMATIONAL",
+    "DEBUG"
+];
+
+const MAX_SEVERITY: u8 = SEVERITIES.len() as u8;
+
+fn populate_byte_field_map<'a, K: ?Sized + Eq + Hash>(names: &'a [&'a K]) -> HashMap<&'a K, u8> {
+    let mut m: HashMap<&K, u8> = HashMap::new();
+    for (i, el) in names.iter().enumerate() {
+        m.insert(el, i.try_into().unwrap());
+    }
+    m
+}
+
+lazy_static! {
+    static ref FACILITIES_MAP : HashMap<&'static str, u8> = populate_byte_field_map::<str>(FACILITIES);
+    static ref DEFAULT_FACILITY: u8 = *FACILITIES_MAP.get("USER").unwrap();
+    static ref SEVERITIES_MAP : HashMap<&'static str, u8> = populate_byte_field_map::<str>(SEVERITIES);
+    static ref DEFAULT_SEVERITY: u8 = *SEVERITIES_MAP.get("INFORMATIONAL").unwrap();
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct SyslogConf {
@@ -164,6 +230,15 @@ fn default_facility() -> Facility {
     Facility::Fixed(0)
 }
 
+/*
+fn check_range<K, E>(num: u8, max: u8) -> Result<> {
+    if num > max {
+        Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"facility number too large"))
+    } else {
+        Ok(Facility::Fixed(num))
+    }
+}
+*/
 fn deserialize_facility<'de, D>(d: D) -> Result<Facility, D::Error>
     where D: de::Deserializer<'de>
 {
@@ -171,6 +246,12 @@ fn deserialize_facility<'de, D>(d: D) -> Result<Facility, D::Error>
     let num_value = value.parse::<u8>();
     match num_value {
         Ok(num) => {
+/*
+            return check_range<
+            Facility::Fixed,
+
+            >(num, 23);
+*/
             if num > 23 {
                 return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"facility number too large"));
             } else {
