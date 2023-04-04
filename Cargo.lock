@@ -9157,7 +9157,6 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic",
  "tower",
  "tracing 0.1.37",
  "tracing-core 0.1.30",
