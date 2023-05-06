@@ -226,29 +226,24 @@ impl SslAcceptor {
     /// Creates a new builder configured with the minimal TLS version and specific ciphersuites.
     pub fn custom(method: SslMethod, min_tls_version: &String, ciphersuites: &String) -> Result<SslAcceptorBuilder, ErrorStack> {
         let mut ctx = ctx(method)?;
-        let min_proto_version: SslVersion;
+        let mut min_proto_version = SslVersion::TLS1;
         match min_tls_version.as_str() {
             "VersionTLS10" => min_proto_version = SslVersion::TLS1,
             "VersionTLS11" => min_proto_version = SslVersion::TLS1_1,
             "VersionTLS12" => min_proto_version = SslVersion::TLS1_2,
             "VersionTLS13" => min_proto_version = SslVersion::TLS1_3,
-            _ => min_proto_version = SslVersion::TLS1,
+            _ => (),
         }
         ctx.set_min_proto_version(Some(min_proto_version))?;
         let dh = Dh::params_from_pem(FFDHE_2048.as_bytes())?;
         ctx.set_tmp_dh(&dh)?;
         setup_curves(&mut ctx)?;
-        if min_proto_version == SslVersion::TLS1_3 {
-            let tls13_ciphersuites: String;
-            if ciphersuites.is_empty() {
-                tls13_ciphersuites = "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256".to_string();
+        if !ciphersuites.is_empty() {
+            if min_proto_version == SslVersion::TLS1_3 {
+                ctx.set_ciphersuites(&ciphersuites.replace(",", ":"))?;
             } else {
-                tls13_ciphersuites = ciphersuites.clone();
+                ctx.set_cipher_list(ciphersuites.replace(",", ":").as_str())?;
             }
-            #[cfg(ossl111)]
-            ctx.set_ciphersuites(&tls13_ciphersuites.replace(",", ":"))?;
-        } else if !ciphersuites.is_empty() {
-            ctx.set_cipher_list(ciphersuites.replace(",", ":").as_str())?;
         }
         Ok(SslAcceptorBuilder(ctx))
     }

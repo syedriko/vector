@@ -4,7 +4,7 @@ use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod, SslVersion},
 };
 use snafu::{ResultExt, Snafu};
 use std::num::TryFromIntError;
@@ -178,6 +178,32 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
+        let mut min_proto_version = SslVersion::TLS1;
+        if let Some(min_tls_version) = &settings.min_tls_version {
+            match min_tls_version.as_str() {
+                "VersionTLS10" => min_proto_version = SslVersion::TLS1,
+                "VersionTLS11" => min_proto_version = SslVersion::TLS1_1,
+                "VersionTLS12" => min_proto_version = SslVersion::TLS1_2,
+                "VersionTLS13" => min_proto_version = SslVersion::TLS1_3,
+                _ => (),
+            }
+            builder
+            .set_min_proto_version(Some(min_proto_version))
+            .map_err(|e| TlsError::SslBuildError { source:e })?
+        }
+        if let Some(ciphersuites) = &settings.ciphersuites {
+            if !ciphersuites.is_empty() {
+                if min_proto_version == SslVersion::TLS1_3 {
+                    builder
+                    .set_ciphersuites(&ciphersuites.replace(",", ":"))
+                    .map_err(|e| TlsError::SslBuildError { source:e })?
+                } else {
+                    builder
+                    .set_cipher_list(ciphersuites.replace(",", ":")
+                    .as_str()).map_err(|e| TlsError::SslBuildError { source:e })?
+                }
+            }
+        }
     }
     Ok(builder)
 }
