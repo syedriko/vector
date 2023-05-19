@@ -309,7 +309,7 @@ fn get_num_facility(config_facility: &Facility, log: &LogEvent) -> u8 {
         Facility::Fixed(num) => return *num,
         Facility::Field(field_name) => {
             if let Some(field_value) = log.get(field_name.as_str()) {
-                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+                let field_value_string = value_to_string(field_value);
                 let num_value = field_value_string.parse::<u8>();
                 match num_value {
                     Ok(num) => {
@@ -366,7 +366,7 @@ fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
         Severity::Fixed(num) => return *num,
         Severity::Field(field_name) => {
             if let Some(field_value) = log.get(field_name.as_str()) {
-                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+                let field_value_string = value_to_string(field_value);
                 let num_value = field_value_string.parse::<u8>();
                 match num_value {
                     Ok(num) => {
@@ -412,7 +412,7 @@ fn get_field_or_config(config_name: &String, log: &LogEvent) -> String {
 
 fn get_field(field_name: &str, log: &LogEvent) -> String {
     if let Some(field_value) = log.get(field_name) {
-        return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
+        return value_to_string(field_value)
     } else {
         return NILVALUE.to_string()
     }
@@ -429,6 +429,27 @@ fn get_timestamp(log: &LogEvent) -> DateTime::<Local> {
         },
         _ => Local::now()
     }
+}
+
+fn is_container_log_event(log: &LogEvent) -> bool {
+    log.get("kubernetes").is_some()
+}
+
+fn get_tag(config_tag: &String, log: &LogEvent) -> String {
+    if let Some(syslog_id_value) = log.get("systemd.u.SYSLOG_IDENTIFIER") {
+        let syslog_id_string = value_to_string(syslog_id_value);
+        if let Some(pid_value) = log.get("systemd.t.PID") {
+            let pid_string = value_to_string(pid_value);
+            return syslog_id_string + "[" + pid_string.as_str() + "]"
+        } else {
+            return syslog_id_string
+        }
+    }
+    get_field_or_config(config_tag, log)
+}
+
+fn value_to_string(value: &Value) -> String {
+    String::from_utf8(value.coerce_to_bytes().to_vec()).unwrap_or_default()
 }
 
 /**
@@ -461,9 +482,9 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     buf.push_str(&formatted_timestamp);
                     buf.push_str(&get_field("hostname", &log));
                     buf.push(' ');
-                    buf.push_str(&get_field_or_config(&config.tag, &log));
+                    buf.push_str(&get_tag(&config.tag, &log));
                     buf.push_str(": ");
-                    if config.add_log_source {
+                    if config.add_log_source && is_container_log_event(&log) {
                         add_log_source(&log, &mut buf);
                     }
                 },
@@ -480,7 +501,7 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
                     buf.push(' ');
                     buf.push_str(&get_field_or_config(&&config.msg_id, &log));
                     buf.push_str(" - "); // no structured data
-                    if config.add_log_source {
+                    if config.add_log_source && is_container_log_event(&log) {
                         add_log_source(&log, &mut buf);
                     }
                 }
