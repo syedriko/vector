@@ -5533,9 +5533,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendal"
-version = "0.37.0"
+version = "0.38.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a37de9fe637d53550bf3f76d5c731f69cb6f9685ada6afd390ada98994a3f91"
+checksum = "4df645b6012162c04c8949e9b96ae2ef002e79189cfb154e507e51ac5be76a09"
 dependencies = [
  "anyhow",
  "async-compat",
