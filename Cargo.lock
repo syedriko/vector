@@ -1046,11 +1046,11 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http"
-version = "0.54.4"
+version = "0.55.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "873f316f1833add0d3aa54ed1b0cd252ddd88c792a0cf839886400099971e844"
+checksum = "2b3b693869133551f135e1f2c77cb0b8277d9e3e17feaf2213f735857c4f0d28"
 dependencies = [
- "aws-smithy-types 0.54.4",
+ "aws-smithy-types 0.55.3",
  "bytes 1.4.0",
  "bytes-utils",
  "futures-core",
@@ -1066,11 +1066,11 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http"
-version = "0.55.3"
+version = "0.56.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b3b693869133551f135e1f2c77cb0b8277d9e3e17feaf2213f735857c4f0d28"
+checksum = "54cdcf365d8eee60686885f750a34c190e513677db58bbc466c44c588abf4199"
 dependencies = [
- "aws-smithy-types 0.55.3",
+ "aws-smithy-types 0.56.1",
  "bytes 1.4.0",
  "bytes-utils",
  "futures-core",
@@ -1101,12 +1101,12 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-http-tower"
-version = "0.54.4"
+version = "0.56.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f38231d3f5dac9ac7976f44e12803add1385119ffca9e5f050d8e980733d164"
+checksum = "822de399d0ce62829a69dfa8c5cd08efdbe61a7426b953e2268f8b8b52a607bd"
 dependencies = [
- "aws-smithy-http 0.54.4",
- "aws-smithy-types 0.54.4",
+ "aws-smithy-http 0.56.1",
+ "aws-smithy-types 0.56.1",
  "bytes 1.4.0",
  "http",
  "http-body",
@@ -1148,9 +1148,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-types"
-version = "0.54.4"
+version = "0.55.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8161232eda10290f5136610a1eb9de56aceaccd70c963a26a260af20ac24794f"
+checksum = "16a3d0bf4f324f4ef9793b86a1701d9700fbcdbd12a846da45eed104c634c6e8"
 dependencies = [
  "base64-simd",
  "itoa",
@@ -1161,14 +1161,15 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-types"
-version = "0.55.3"
+version = "0.56.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16a3d0bf4f324f4ef9793b86a1701d9700fbcdbd12a846da45eed104c634c6e8"
+checksum = "d90dbc8da2f6be461fa3c1906b20af8f79d14968fe47f2b7d29d086f62a51728"
 dependencies = [
  "base64-simd",
  "itoa",
  "num-integer",
  "ryu",
+ "serde",
  "time",
 ]
 
@@ -9123,7 +9124,7 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-client",
  "aws-smithy-http 0.51.0",
- "aws-smithy-http-tower 0.54.4",
+ "aws-smithy-http-tower 0.56.1",
  "aws-smithy-types 0.51.0",
  "aws-types",
  "axum",
