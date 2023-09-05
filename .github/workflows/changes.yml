@@ -143,7 +143,7 @@ jobs:
       splunk: ${{ steps.filter.outputs.splunk }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - uses: dorny/paths-filter@v2
       id: filter
