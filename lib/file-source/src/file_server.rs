@@ -5,6 +5,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
     time::{self, Duration},
+    io,
 };
 
 use bytes::Bytes;
@@ -155,6 +156,16 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
+            match gc_deleted_files() {
+                Ok(_) => {},
+                Err(e) => {
+                    info!(
+                        message = "Error during GC of deleted files",
+                        error = e.to_string()
+                    );
+                },
+            }
+
             // Glob find files to follow, but not too often.
             let now_time = time::Instant::now();
             if next_glob_time <= now_time {
@@ -522,4 +533,26 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+fn gc_deleted_files() -> io::Result<()> {
+    for fd in fs::read_dir("/proc/".to_owned() + &std::process::id().to_string() + "/fd")? {
+        let fd = fd?;
+        let fd_path = fd.path();
+        let link = fs::read_link(&fd_path)?;
+        let link_name = link.file_name().ok_or(io::Error::new(io::ErrorKind::Other, "unable to get link file name"))?;
+        if link_name.to_str().ok_or(io::Error::new(io::ErrorKind::Other, "unable to get link file name as string"))?.ends_with(" (deleted)") {
+            match fd_path.to_str().ok_or(io::Error::new(io::ErrorKind::Other, "unable to get fd file name as string"))?.parse::<i32>() {
+                Ok(i) => {
+                    info!(
+                        message = "Forcefully closing deleted file.",
+                        link_name = ?link_name
+                    );
+                    unsafe { libc::close(i); }
+                },
+                Err(_) => {},
+            };
+        }
+    }
+    Ok(())
 }
