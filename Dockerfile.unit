@@ -29,7 +29,7 @@ COPY . /src
 
 ENV PROTOC=/src/thirdparty/protoc/protoc-linux-x86_64
 
-RUN chmod -R 777 /src $CARGO_HOME
+RUN chmod -R 777 /src $CARGO_HOME $HOME
 RUN mkdir -p ~/.cargo/bin && \
     for plugin in nextest deny; do \
         ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-$(arch) ~/.cargo/bin/cargo-${plugin}; \

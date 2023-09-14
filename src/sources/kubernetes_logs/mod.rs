@@ -232,6 +232,12 @@ pub struct Config {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    /// How long to keep an open handle to a rotated log file.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[serde(default = "default_rotate_wait_ms")]
+    rotate_wait_ms: Duration
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -273,6 +279,7 @@ impl Default for Config {
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
             log_namespace: None,
+            rotate_wait_ms: default_rotate_wait_ms()
         }
     }
 }
@@ -519,6 +526,7 @@ struct Source {
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
+    rotate_wait: Duration
 }
 
 impl Source {
@@ -595,6 +603,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             delay_deletion,
+            rotate_wait: config.rotate_wait_ms
         })
     }
 
@@ -625,6 +634,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             delay_deletion,
+            rotate_wait
         } = self;
 
         let mut reflectors = Vec::new();
@@ -755,6 +765,7 @@ impl Source {
             emitter: FileSourceInternalEventsEmitter,
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
+            rotate_wait
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -949,6 +960,10 @@ const fn default_fingerprint_lines() -> usize {
 
 const fn default_delay_deletion_ms() -> Duration {
     Duration::from_millis(60_000)
+}
+
+const fn default_rotate_wait_ms() -> Duration {
+    Duration::from_millis(u64::MAX/1000)
 }
 
 // This function constructs the patterns we exclude from file watching, created
