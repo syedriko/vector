@@ -84,6 +84,12 @@ fn make_routes(
         .and(with_shared(running))
         .and_then(handler::health);
 
+    let malloc_stats = warp::path("malloc_stats").and_then(handler::malloc_stats);
+
+    let activate_profiling = warp::path("activate_profiling").and_then(handler::activate_profiling);
+
+    let prof_dump = warp::path("prof_dump").and_then(handler::prof_dump);
+
     // 404.
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
@@ -143,6 +149,9 @@ fn make_routes(
     // Wire up the health + GraphQL endpoints. Provides a permissive CORS policy to allow for
     // cross-origin interaction with the Vector API.
     health
+        .or(malloc_stats)
+        .or(activate_profiling)
+        .or(prof_dump)
         .or(graphql_handler)
         .or(graphql_playground)
         .or(not_found)
