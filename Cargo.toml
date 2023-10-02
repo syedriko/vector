@@ -377,6 +377,7 @@ tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-ut
 aws-config = { path = "patch/aws-config" }
 aws-sigv4 = { path = "patch/aws-sigv4" }
 openssl = { path = "patch/openssl" }
+hyper = { path = "patch/hyper" }
 
 [features]
 ocp-logging = [
