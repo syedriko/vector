@@ -417,7 +417,9 @@ ocp-logging = [
   "api",
   "api-client",
 
-  "unix"
+  "unix",
+
+  "tokio-console"
 ]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
