@@ -187,7 +187,7 @@ fn main() {
         malloc_conf += "background_thread:false";
     }
 
-    malloc_conf += ",prof:true,prof_active:false";
+    //malloc_conf += ",prof:true,prof_active:false";
 
     if let Ok(malloc_conf_opts) = read_and_watch_env("JEMALLOC_SYS_WITH_MALLOC_CONF") {
         if !malloc_conf.is_empty() {

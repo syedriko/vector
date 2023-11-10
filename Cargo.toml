@@ -312,7 +312,7 @@ socket2 = { version = "0.4.7", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-tikv-jemallocator = { version = "0.5.0", default-features = false, features = ["stats", "profiling"], optional = true }
+tikv-jemallocator = { version = "0.5.0", default-features = false, features = ["stats", "profiling", "background_threads", "background_threads_runtime_support"], optional = true }
 tikv-jemalloc-sys = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.7", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.18.0", default-features = false, features = ["connect"], optional = true}
@@ -415,6 +415,7 @@ ocp-logging = [
   "sinks-splunk_hec",
   "sinks-http",
   "sinks-socket",
+  "sinks-blackhole",
 
   "api",
   "api-client",
