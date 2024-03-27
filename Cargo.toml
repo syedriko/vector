@@ -399,7 +399,7 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 openssl = { path = "patch/openssl" }
-#hyper = { path = "patch/hyper" }
+hyper = { path = "patch/hyper" }
 
 #[patch."https://github.com/vectordotdev/aws-sdk-rust"]
 #aws-config = { path = "patch/aws-config" }
